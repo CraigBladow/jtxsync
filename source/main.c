@@ -43,6 +43,8 @@ double network_buffer_to_double(const unsigned char *buffer) {
 #define MIN_SAMPLES 10
 uint32_t sample_count,sample_next;
 double sample_array[MAX_SAMPLES], new_array[MAX_SAMPLES];
+uint32_t exit_commanded = 0; //Setting to not 0 causes program to exit
+
 
 
 // standard deviation and mean
@@ -142,7 +144,7 @@ void delta_time_accum(double sample)
 
     // update every 10 samples
     
-    if((sample_count +1) % 10 == 0)
+    if((sample_count) % 10 == 0)
     { 
         double new_mean_time;
         char ans[16];
@@ -161,11 +163,15 @@ void delta_time_accum(double sample)
         }
         new_mean_time = -1.0*(new_mean_sum / new_mean_count);
      
-        printf("Adjust system clock by %f seconds? (Y)es or (N)o?\n",new_mean_time);
+        printf("Adjust system clock by %f seconds? (Y)es, (N)o or (Q)uit?\n",new_mean_time);
         fgets(ans, 16, stdin); 
 
         if(ans[0]=='Y' || ans[0] == 'y') adjustSystemClock(new_mean_time);
-        else printf("Skipping clock adjustment.\n");
+        else
+        {
+            printf("Skipping clock adjustment.\n");
+            if(ans[0]=='Q' || ans[0] == 'q') exit_commanded = 1;
+        }
     }
 
 }
@@ -223,7 +229,7 @@ int main()
 
     init_delta_time_accum();
 
-    while (1) 
+    while (exit_commanded == 0) 
     {
         len = sizeof(cliaddr);
         int n = recvfrom(sockfd, (char *)buffer, MAX_BUF_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
@@ -326,8 +332,8 @@ int main()
 
             }
         }
-    } // end while(1)
-
+    } // end while(exit_commanded == 0)
+    printf("Thank you for using jtxsync!\n")
     close(sockfd);
     return 0;
 }

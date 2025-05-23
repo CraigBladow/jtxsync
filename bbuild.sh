@@ -1,3 +1,3 @@
 #!/bin/sh
 mkdir -p ./build
-gcc source/main.c -lm -o build/k0cwbSync
+gcc source/main.c -lm -o build/jtxsync

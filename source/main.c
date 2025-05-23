@@ -41,7 +41,7 @@ double network_buffer_to_double(const unsigned char *buffer) {
 #define MAX_SAMPLES 20
 #define MIN_SAMPLES 10
 uint32_t sample_count,sample_next;
-double sample_array[MAX_SAMPLES];
+double sample_array[MAX_SAMPLES], new_array[MAX_SAMPLES];
 
 
 // standard deviation and mean
@@ -66,12 +66,10 @@ void print_results(double sdev, double mean, uint32_t number_of_samples_to_print
     for(i=0;i< number_of_samples_to_print;i++)
     {
         printf("%f,",sample_array[i]);
-        
     }
     printf("\n");
-    
-
 }
+
 /*
  * Adjusts the system clock by a specified delta time.
  * returns 0 on success, -1 on failure (and sets errno).
@@ -131,6 +129,7 @@ void init_delta_time_accum(void)
 
 void delta_time_accum(double sample)
 {
+    int i;
     double sdev = 0.0, mean=0.0;
     // accumulate samples in rotating buffer
     // minimum of 10 
@@ -148,8 +147,19 @@ void delta_time_accum(double sample)
         char ans[16];
         sdev = std_deviation(&sample_array[0], sample_count, &mean); 
         print_results(sdev,mean, sample_count);
-        // TODO copy samples to new array that fall within mean+/- 1 or 2 sdev
-        // TODO calculate new mean, this is the proposed time adjustment
+        // calculate new mean from samples that fall within mean+/- 1 or 2 sdev
+        int new_mean_count = 0;
+        double new_mean_sum = 0.0;
+        for(i=0;i<sample_count;i++)
+        {
+            if (fabs(sample_array[i]) <= fabs(mean+sdev))
+            {
+                new_mean_sum +=sample_array[i];
+                new_mean_count++;
+            }
+        }
+        new_mean_time = new_mean_sum / new_mean_count;
+     
         printf("Adjust system clock by %f seconds? (Y)es or (N)o?\n",new_mean_time);
         fgets(ans, 16, stdin); 
 
@@ -306,7 +316,7 @@ int main()
                     //uint32_t delta_freq = (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
                     //if(DEBUG) printf("    delta freq: %u\n",delta_freq);
 
-                    //decode mode
+                    //decode mode - not needed
                     //char mode = buffer[count++];
                     //if(DEBUG) printf("    mode: %d\n",(int)mode);
                 }

@@ -16,6 +16,8 @@
 
 #define DEBUG 0
 
+uint32_t exit_commanded = 0; //Setting to not 0 causes program to exit
+
 double network_buffer_to_double(const unsigned char *buffer) {
     double value;
     unsigned char temp_buffer[sizeof(double)];
@@ -37,28 +39,6 @@ double network_buffer_to_double(const unsigned char *buffer) {
     // Copy the (potentially reordered) bytes into the double variable
     memcpy(&value, temp_buffer, sizeof(double));
     return value;
-}
-
-#define MAX_SAMPLES 20
-#define MIN_SAMPLES 10
-uint32_t sample_count,sample_next;
-double sample_array[MAX_SAMPLES], new_array[MAX_SAMPLES];
-uint32_t exit_commanded = 0; //Setting to not 0 causes program to exit
-
-
-
-// standard deviation and mean
-double std_deviation(double data[], uint32_t data_len, double *mean) 
-{
-
-    double sum = 0.0, std_dev = 0.0,sum_sqrs=0.0,variance = 0.0;
-    int i;
-    for (i = 0; i < data_len; i++) sum += data[i];
-    *mean = sum / data_len;
-    for (i = 0; i < data_len; i++) sum_sqrs += pow(data[i] - *mean, 2);
-    variance = sum_sqrs/data_len;
-    std_dev = sqrt(variance);
-    return std_dev;
 }
 
 
@@ -115,6 +95,31 @@ int adjustSystemClock(double delta_time) {
     return 0;
 }
 
+
+
+// Time adjustment calculations
+#define MAX_SAMPLES 20
+#define MIN_SAMPLES 10
+uint32_t sample_count,sample_next;
+double sample_array[MAX_SAMPLES], new_array[MAX_SAMPLES];
+
+// standard deviation and mean
+double std_deviation(double data[], uint32_t data_len, double *mean) 
+{
+    double sum = 0.0, std_dev = 0.0,sum_sqrs=0.0,variance = 0.0;
+    int i;
+    if(data_len > MAX_SAMPLES) 
+    {
+        data_len = MAX_SAMPLES;
+        printf("data_len toooo long!\n");
+    }
+    for (i = 0; i < data_len; i++) sum += data[i];
+    *mean = sum / data_len;
+    for (i = 0; i < data_len; i++) sum_sqrs += pow(data[i] - *mean, 2);
+    variance = sum_sqrs/data_len;
+    std_dev = sqrt(variance);
+    return std_dev;
+}
 void init_delta_time_accum(void)
 {
     printf("Initializing Time Correction Calculation.\n");
@@ -141,7 +146,7 @@ void delta_time_accum(double sample)
     { 
         double new_mean_time;
         char ans[16];
-        sdev = std_deviation(&sample_array[0], sample_count, &mean); 
+        sdev = std_deviation(&sample_array[0], sample_next, &mean); 
         if(DEBUG) printf("sdev: %f mean: %f\n",sdev, mean);
         // calculate new mean from samples that fall within mean+/- 1 or 2 sdev
         int new_mean_count = 0;

@@ -61,17 +61,6 @@ double std_deviation(double data[], uint32_t data_len, double *mean)
     return std_dev;
 }
 
-void print_results(double sdev, double mean, uint32_t number_of_samples_to_print)
-{
-    int i;
-    printf("sdev: %f mean: %f\n",sdev, mean);
-    /*printf("samples: ");
-    for(i=0;i< number_of_samples_to_print;i++)
-    {
-        printf("%f,",sample_array[i]);
-    }
-    printf("\n");*/
-}
 
 /*
  * Adjusts the system clock by a specified delta time.
@@ -82,6 +71,8 @@ int adjustSystemClock(double delta_time) {
     struct timeval new_time;
     long seconds;
     long microseconds;
+
+    char ans[16];
 
     // Get the current system time
     if (gettimeofday(&current_time, NULL) == -1) {
@@ -118,7 +109,9 @@ int adjustSystemClock(double delta_time) {
 
     printf("System clock adjusted successfully by %lf seconds.\n", delta_time);
    // printf("New system time set to: %ld seconds, %i microseconds since epoch.\n", new_time.tv_sec, new_time.tv_usec);
-
+    printf("Do you want to quit jtxsync?  (Y)es, (N)o ?\n");
+    fgets(ans, 16, stdin); 
+    if(ans[0]=='Y' || ans[0] == 'y') exit_commanded = 1;
     return 0;
 }
 
@@ -136,11 +129,11 @@ void delta_time_accum(double sample)
     double sdev = 0.0, mean=0.0;
     // accumulate samples in rotating buffer
     // minimum of 10 
+    printf("sample %u: %f \n",sample_count,sample);
     sample_array[sample_next]=sample;
-
     if(++sample_next >= MAX_SAMPLES) sample_next = 0;
-    if(sample_count < MAX_SAMPLES-1) sample_count++;
-    printf("sample: %f sample_count: %u\n",sample,sample_count);
+    sample_count++;
+    
 
     // update every 10 samples
     
@@ -149,7 +142,7 @@ void delta_time_accum(double sample)
         double new_mean_time;
         char ans[16];
         sdev = std_deviation(&sample_array[0], sample_count, &mean); 
-        print_results(sdev,mean, sample_count);
+        if(DEBUG) printf("sdev: %f mean: %f\n",sdev, mean);
         // calculate new mean from samples that fall within mean+/- 1 or 2 sdev
         int new_mean_count = 0;
         double new_mean_sum = 0.0;
@@ -201,7 +194,11 @@ int main()
     socklen_t len;
     char buffer[MAX_BUF_SIZE];
 
+    uint32_t status_receiving = 0;  // Inital one time receive success message sets to 1
 
+    // Welcome 
+    printf("Welcome to jtxsync development version 0.1 by K0CWB.\n");
+    printf("Copyright (C) 2025 Craig Bladow.  All rights reserved.\n");
 
     // Create UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
@@ -225,7 +222,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    printf("Listening on port %d...\n", WSJTX_PORT);
+    printf("Listening on Localhost port %d...\n", WSJTX_PORT);
 
     init_delta_time_accum();
 
@@ -290,14 +287,23 @@ int main()
                 uid_len |= (buffer[count++] << 16); 
                 uid_len |= (buffer[count++]<< 8); 
                 uid_len |= (buffer[count++]);
-                if(DEBUG) printf("    Unique ID len: %u\n",uid_len);
+
                 char uid[16];
+                if(uid_len > 15) uid_len = 15;  // Don't let the length exceed uid[] size less one.
+                if(DEBUG) printf("    Unique ID len: %u\n",uid_len);
                 for(i=0;i< uid_len;i++) uid[i]=buffer[count++];
                 uid[count++]='\0';
                 if(DEBUG) printf("    Unique ID: %s\n",uid);  // its WSJT-X !
 
                 if(strcmp(uid,"WSJT-X")==0)
                 {
+                    // Inital one time receive success message
+                    if(status_receiving == 0)
+                    {
+                        printf("Receiving Decode message(s) from WSJT-X\n");
+                        status_receiving = 1;
+                    }
+                     
                     // decode new bool
                     char  new_bool = buffer[count++];       
                     if(DEBUG) printf("    new_bool %d\n",new_bool);
@@ -333,7 +339,7 @@ int main()
             }
         }
     } // end while(exit_commanded == 0)
-    printf("Thank you for using jtxsync!\n")
+    printf("Thank you for using jtxsync!\n");
     close(sockfd);
     return 0;
 }

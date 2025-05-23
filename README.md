@@ -1,5 +1,5 @@
 # wsjt_sync_k0cwb
-Utility to adjust system time base on received messages delta time information.
+Utility to adjust system clock using received messages delta time information.
 
 THIS IS A WORK IN EARLY DEVELOPMENT AND NOT FULLY FUNCTIONAL.
 

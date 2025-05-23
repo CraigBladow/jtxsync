@@ -72,42 +72,6 @@ void print_results(double sdev, double mean, uint32_t number_of_samples_to_print
     
 
 }
-
-void init_delta_time_accum(void)
-{
-    printf("Initializing Time Correction Calculation.\n");
-    sample_count = 0;
-    sample_next = 0;
-    memset(sample_array, 0, sizeof(sample_array));
-}
-
-void delta_time_accum(double sample)
-{
-    double sdev = 0.0, mean=0.0;
-    // accumulate samples in rotating buffer
-    // minimum of 10 
-    sample_array[sample_next]=sample;
-
-    if(++sample_next >= MAX_SAMPLES) sample_next = 0;
-    if(sample_count < MAX_SAMPLES-1) sample_count++;
-    printf("sample: %f sample_count: %u\n",sample,sample_count);
-
-    // update every 10 samples
-    
-    if(sample_count >= MIN_SAMPLES)
-    { 
-        double new_mean_time;
-        sdev = std_deviation(&sample_array[0], sample_count, &mean); 
-        print_results(sdev,mean, sample_count);
-        // TODO copy samples to new array that fall within mean+/- 1 or 2 sdev
-        // TODO calculate new mean, this is the proposed time adjustmen
-        // prompt user with proposed time y/n
-        // If yes, apply the change
-        adjustSystemClock(new_mean_time);
-    }
-
-}
-
 /*
  * Adjusts the system clock by a specified delta time.
  * returns 0 on success, -1 on failure (and sets errno).
@@ -156,6 +120,45 @@ int adjustSystemClock(double delta_time) {
 
     return 0;
 }
+
+void init_delta_time_accum(void)
+{
+    printf("Initializing Time Correction Calculation.\n");
+    sample_count = 0;
+    sample_next = 0;
+    memset(sample_array, 0, sizeof(sample_array));
+}
+
+void delta_time_accum(double sample)
+{
+    double sdev = 0.0, mean=0.0;
+    // accumulate samples in rotating buffer
+    // minimum of 10 
+    sample_array[sample_next]=sample;
+
+    if(++sample_next >= MAX_SAMPLES) sample_next = 0;
+    if(sample_count < MAX_SAMPLES-1) sample_count++;
+    printf("sample: %f sample_count: %u\n",sample,sample_count);
+
+    // update every 10 samples
+    
+    if(sample_count >= MIN_SAMPLES)
+    { 
+        double new_mean_time;
+        char ans[16];
+        sdev = std_deviation(&sample_array[0], sample_count, &mean); 
+        print_results(sdev,mean, sample_count);
+        // TODO copy samples to new array that fall within mean+/- 1 or 2 sdev
+        // TODO calculate new mean, this is the proposed time adjustment
+        printf("Adjust system clock by %f seconds? (Y)es or (N)o?\n",new_mean_time);
+        fgets(ans, 16, stdin); 
+
+        if(ans[0]=='Y' || ans[0] == 'y') adjustSystemClock(new_mean_time);
+        else printf("Skipping clock adjustment.\n");
+    }
+
+}
+
 
 
 
@@ -264,7 +267,12 @@ int main()
         
                 // Decode Unique Id it shoulb be WSJT-X
                 // Ignore if not WSJT-X 
-                uid_len= (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
+                //uid_len= (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
+                //doing as follows to quiet warnings
+                uid_len= (buffer[count++] << 24);
+                uid_len |= (buffer[count++] << 16); 
+                uid_len |= (buffer[count++]<< 8); 
+                uid_len |= (buffer[count++]);
                 if(DEBUG) printf("    Unique ID len: %u\n",uid_len);
                 char uid[16];
                 for(i=0;i< uid_len;i++) uid[i]=buffer[count++];
@@ -280,24 +288,27 @@ int main()
                     // skip three byte Time vale
                     count += 3; //skipping Time.
     
-                    int32_t snr = ((int32_t)buffer[count++] << 24) | ((int32_t)buffer[count++] << 16) | ((int32_t)buffer[count++]<< 8) | ((int32_t)buffer[count++]);
+                    int32_t snr = ((int32_t)buffer[count++] << 24);
+                    snr |= ((int32_t)buffer[count++] << 16);
+                    snr |= ((int32_t)buffer[count++]<< 8);
+                    snr |= ((int32_t)buffer[count++]);
                     if(DEBUG) printf("    snr: %d\n",snr);
 
                     // decode delta time
                     char dtbuf[8];
                     for (i=0;i<8;i++) dtbuf[i]=buffer[count+i];
-                    delta_time = network_buffer_to_double(dtbuf);
+                    delta_time = network_buffer_to_double((const unsigned char *)dtbuf);
                     delta_time_accum(delta_time);
                     count += 8;
                     if(DEBUG) printf("    delta time: %f\n",delta_time);
 
-                    // decode delta frequency - not reliable    
-                    uint32_t delta_freq = (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
-                    if(DEBUG) printf("    delta freq: %u\n",delta_freq);
+                    // decode delta frequency - not reliable and not needed
+                    //uint32_t delta_freq = (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
+                    //if(DEBUG) printf("    delta freq: %u\n",delta_freq);
 
                     //decode mode
-                    char mode = buffer[count++];
-                    if(DEBUG) printf("    mode: %d\n",(int)mode);
+                    //char mode = buffer[count++];
+                    //if(DEBUG) printf("    mode: %d\n",(int)mode);
                 }
                 else if(DEBUG) printf("Receiving traffic from %s",uid);
 
@@ -309,60 +320,3 @@ int main()
     close(sockfd);
     return 0;
 }
-
-
-
-
-// --- Example Usage ---
-int main() {
-    // Example 1: Advance the clock by 10.5 seconds
-    time_t current_time = time(NULL);
-    printf("Current time: %s", ctime(&current_time));
-    printf("Attempting to advance clock by 10.5 seconds...\n");
-    if (adjustSystemClock(10.5) == 0) {
-        printf("Clock adjustment successful.\n");
-        current_time = time(NULL);
-         printf("Current time: %s", ctime(&current_time));
-    } else {
-        printf("Clock adjustment failed.\n");
-    }
-
-    printf("\n");
-
-    // Example 2: Rewind the clock by 5.25 seconds
-    printf("Attempting to rewind clock by 5.25 seconds...\n");
-    if (adjustSystemClock(-5.25) == 0) {
-        printf("Clock adjustment successful.\n");
-        current_time = time(NULL);
-         printf("Current time: %s", ctime(&current_time));
-    } else {
-        printf("Clock adjustment failed.\n");
-    }
-
-    printf("\n");
-
-    // Example 3: Attempt to adjust by 0 seconds (no change)
-    printf("Attempting to adjust clock by 0.0 seconds...\n");
-    if (adjustSystemClock(0.0) == 0) {
-        printf("Clock adjustment successful.\n");
-        current_time = time(NULL);
-         printf("Current time: %s", ctime(&current_time));
-    } else {
-        printf("Clock adjustment failed.\n");
-    }
-
-        // Example 2: Rewind the clock by 5.25 seconds
-    printf("Attempting to rewind clock by 5.25 seconds...\n");
-    if (adjustSystemClock(-5.25) == 0) {
-        printf("Clock adjustment successful.\n");
-        current_time = time(NULL);
-         printf("Current time: %s", ctime(&current_time));
-    } else {
-        printf("Clock adjustment failed.\n");
-    }
-
-    return 0;
-}
-
-
-

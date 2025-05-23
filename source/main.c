@@ -6,6 +6,9 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include <math.h>
+#include <sys/time.h> 
+#include <errno.h>    
+#include <string.h>   
 
 #define WSJTX_PORT 2237
 #define MAX_BUF_SIZE 1024
@@ -93,12 +96,66 @@ void delta_time_accum(double sample)
     
     if(sample_count >= MIN_SAMPLES)
     { 
+        double new_mean_time;
         sdev = std_deviation(&sample_array[0], sample_count, &mean); 
         print_results(sdev,mean, sample_count);
+        // TODO copy samples to new array that fall within mean+/- 1 or 2 sdev
+        // TODO calculate new mean, this is the proposed time adjustmen
+        // prompt user with proposed time y/n
+        // If yes, apply the change
+        adjustSystemClock(new_mean_time);
     }
 
 }
 
+/*
+ * Adjusts the system clock by a specified delta time.
+ * returns 0 on success, -1 on failure (and sets errno).
+ */
+int adjustSystemClock(double delta_time) {
+    struct timeval current_time;
+    struct timeval new_time;
+    long seconds;
+    long microseconds;
+
+    // Get the current system time
+    if (gettimeofday(&current_time, NULL) == -1) {
+        perror("Error getting current time");
+        return -1;
+    }
+
+    // Convert delta_time (double) into seconds and microseconds
+    seconds = (long)delta_time;
+    microseconds = (long)((delta_time - seconds) * 1000000.0);
+
+    // Calculate the new time
+    new_time.tv_sec = current_time.tv_sec + seconds;
+    new_time.tv_usec = current_time.tv_usec + microseconds;
+
+    // Handle potential microsecond overflow/underflow
+    if (new_time.tv_usec >= 1000000) {
+        new_time.tv_sec++;
+        new_time.tv_usec -= 1000000;
+    } else if (new_time.tv_usec < 0) {
+        new_time.tv_sec--;
+        new_time.tv_usec += 1000000;
+    }
+
+    // Set the new system time
+    if (settimeofday(&new_time, NULL) == -1) {
+        fprintf(stderr, "Error setting new time: %s\n", strerror(errno));
+        // Specific error message for permission denied
+        if (errno == EPERM) {
+            fprintf(stderr, "Permission denied. You might need to run this program as root (e.g., using 'sudo').\n");
+        }
+        return -1;
+    }
+
+    printf("System clock adjusted successfully by %lf seconds.\n", delta_time);
+   // printf("New system time set to: %ld seconds, %i microseconds since epoch.\n", new_time.tv_sec, new_time.tv_usec);
+
+    return 0;
+}
 
 
 
@@ -252,3 +309,60 @@ int main()
     close(sockfd);
     return 0;
 }
+
+
+
+
+// --- Example Usage ---
+int main() {
+    // Example 1: Advance the clock by 10.5 seconds
+    time_t current_time = time(NULL);
+    printf("Current time: %s", ctime(&current_time));
+    printf("Attempting to advance clock by 10.5 seconds...\n");
+    if (adjustSystemClock(10.5) == 0) {
+        printf("Clock adjustment successful.\n");
+        current_time = time(NULL);
+         printf("Current time: %s", ctime(&current_time));
+    } else {
+        printf("Clock adjustment failed.\n");
+    }
+
+    printf("\n");
+
+    // Example 2: Rewind the clock by 5.25 seconds
+    printf("Attempting to rewind clock by 5.25 seconds...\n");
+    if (adjustSystemClock(-5.25) == 0) {
+        printf("Clock adjustment successful.\n");
+        current_time = time(NULL);
+         printf("Current time: %s", ctime(&current_time));
+    } else {
+        printf("Clock adjustment failed.\n");
+    }
+
+    printf("\n");
+
+    // Example 3: Attempt to adjust by 0 seconds (no change)
+    printf("Attempting to adjust clock by 0.0 seconds...\n");
+    if (adjustSystemClock(0.0) == 0) {
+        printf("Clock adjustment successful.\n");
+        current_time = time(NULL);
+         printf("Current time: %s", ctime(&current_time));
+    } else {
+        printf("Clock adjustment failed.\n");
+    }
+
+        // Example 2: Rewind the clock by 5.25 seconds
+    printf("Attempting to rewind clock by 5.25 seconds...\n");
+    if (adjustSystemClock(-5.25) == 0) {
+        printf("Clock adjustment successful.\n");
+        current_time = time(NULL);
+         printf("Current time: %s", ctime(&current_time));
+    } else {
+        printf("Clock adjustment failed.\n");
+    }
+
+    return 0;
+}
+
+
+

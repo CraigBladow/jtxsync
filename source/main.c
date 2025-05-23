@@ -204,6 +204,8 @@ int main()
     // Welcome 
     printf("Welcome to jtxsync development version 0.1 by K0CWB.\n");
     printf("Copyright (C) 2025 Craig Bladow.  All rights reserved.\n");
+    printf("This is free software; see the LICENSE file for copying conditions.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
+
 
     // Create UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 

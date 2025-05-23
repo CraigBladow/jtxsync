@@ -1,4 +1,5 @@
 // TODO does this work on ARM?
+// TODO check for off by one in sample_count logic
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,13 +62,13 @@ double std_deviation(double data[], uint32_t data_len, double *mean)
 void print_results(double sdev, double mean, uint32_t number_of_samples_to_print)
 {
     int i;
-    printf("sdev: %f mean: %f",sdev, mean);
-    printf("samples: ");
+    printf("sdev: %f mean: %f\n",sdev, mean);
+    /*printf("samples: ");
     for(i=0;i< number_of_samples_to_print;i++)
     {
         printf("%f,",sample_array[i]);
     }
-    printf("\n");
+    printf("\n");*/
 }
 
 /*
@@ -141,7 +142,7 @@ void delta_time_accum(double sample)
 
     // update every 10 samples
     
-    if(sample_count >= MIN_SAMPLES)
+    if((sample_count +1) % 10 == 0)
     { 
         double new_mean_time;
         char ans[16];
@@ -158,7 +159,7 @@ void delta_time_accum(double sample)
                 new_mean_count++;
             }
         }
-        new_mean_time = new_mean_sum / new_mean_count;
+        new_mean_time = -1.0*(new_mean_sum / new_mean_count);
      
         printf("Adjust system clock by %f seconds? (Y)es or (N)o?\n",new_mean_time);
         fgets(ans, 16, stdin); 

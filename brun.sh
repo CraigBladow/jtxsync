@@ -1,3 +1,3 @@
 #!/bin/sh
-./build.sh
+./bbuild.sh
 ./build/k0cwbSync

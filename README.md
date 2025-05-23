@@ -1,4 +1,4 @@
-# wsjt_sync_k0cwb
+# jtxsync
 Utility used in conjuntion with WSJT-X ot adjust system clock using received FT8 messages delta time information.
 
 THIS IS A WORK IN EARLY DEVELOPMENT AND NOT FULLY FUNCTIONAL.

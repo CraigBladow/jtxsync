@@ -12,9 +12,9 @@ Use of this utility will require root privleges via sudo to adjust the system cl
 After starting WSJT-X in FT8 mode and messages are being decoded, open a terminal in the directory holding jtsync and run the following command, "sudo ./jtxsync".\
 Once jtsync has gathered delta time samples from 10 messages, the user will be prompted to adjust the system clock.\
 Selecting Y for yes will update the system clock, N for no will not update the system clock, and Q for quit will exit the program.\
-Selecting N for no will cause jtxsync to gather 10 more messages and prompt the user again to approve an adjustment.\
+Selecting N for no will cause jtxsync to gather 10 more messages and prompt the user again to approve an adjustment.
 
-Typical use would be to run jtxsync shortly after launching WSJT-X and updating the system clock to align better with incoming FT8 messages.\
+Typical use would be to run jtxsync shortly after launching WSJT-X and updating the system clock to align better with incoming FT8 messages.
 
 Installation:\
     Linux:\

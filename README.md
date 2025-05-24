@@ -5,7 +5,7 @@ jtsync is intended for Linux and MacOS systems.
 Status:  
     Linux: Working\
     MacOS Apple Silicon: Working\
-    MacOS Intel: Working\
+    MacOS Intel: Working
     
 Runs in the Terminal.\
 Use of this utility will require root privleges via sudo to adjust the system clock.\

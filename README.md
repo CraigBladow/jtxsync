@@ -22,7 +22,7 @@ Installation:\
         2. git clone https://github.com/CraigBladow/jtxsync.git  
         3. cd jtxsync\
         4. ./bbuild.sh  builds the binary jtxsync in the jtsync/build directory.\
-    MacOs:
+    MacOs:\
         1. Install MacOs command line tools see: (https://www.freecodecamp.org/news/install-xcode-command-line-tools/)  
         2. git clone https://github.com/CraigBladow/jtxsync.git  
         3. cd jtxsync  

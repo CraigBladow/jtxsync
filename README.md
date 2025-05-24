@@ -18,7 +18,7 @@ Typical use would be to run jtxsync shortly after launching WSJT-X and updating 
 
 Installation:\
     Linux:\
-        1. Install your distribution's 'build-essentials' or equivalent ensuring that 'git' and 'gcc' are installed.\
+        :1. Install your distribution's 'build-essentials' or equivalent ensuring that 'git' and 'gcc' are installed.\
         2. git clone https://github.com/CraigBladow/jtxsync.git  
         3. cd jtxsync\
         4. ./bbuild.sh  builds the binary jtxsync in the jtsync/build directory.\

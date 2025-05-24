@@ -1,5 +1,6 @@
+// TODO fix nan result if first adjustment NOT accepted with a no answer.
 // TODO does this work on ARM?
-// TODO check for off by one in sample_count logic
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +54,7 @@ int adjustSystemClock(double delta_time) {
     long microseconds;
 
     char ans[16];
-
+    time_t t; // Define the variable t
     // Get the current system time
     if (gettimeofday(&current_time, NULL) == -1) {
         perror("Error getting current time");
@@ -76,7 +77,9 @@ int adjustSystemClock(double delta_time) {
         new_time.tv_sec--;
         new_time.tv_usec += 1000000;
     }
-
+    //Print the time before adjustment
+    time(&t); // Get the current time
+    printf("Current time is: %s", ctime(&t)); // Display the current time
     // Set the new system time
     if (settimeofday(&new_time, NULL) == -1) {
         fprintf(stderr, "Error setting new time: %s\n", strerror(errno));
@@ -86,6 +89,11 @@ int adjustSystemClock(double delta_time) {
         }
         return -1;
     }
+    else
+    {
+        time(&t); // Get the adjusted time
+        printf("Adjusted time is: %s", ctime(&t)); // Display the adjusted time
+    }
 
     printf("System clock adjusted successfully by %lf seconds.\n", delta_time);
    // printf("New system time set to: %ld seconds, %i microseconds since epoch.\n", new_time.tv_sec, new_time.tv_usec);
@@ -94,8 +102,6 @@ int adjustSystemClock(double delta_time) {
     if(ans[0]=='Y' || ans[0] == 'y') exit_commanded = 1;
     return 0;
 }
-
-
 
 // Time adjustment calculations
 #define MAX_SAMPLES 20
@@ -132,6 +138,7 @@ void delta_time_accum(double sample)
 {
     int i;
     double sdev = 0.0, mean=0.0;
+
     // accumulate samples in rotating buffer
     // minimum of 10 
     printf("sample %u: %f \n",sample_count,sample);
@@ -164,7 +171,7 @@ void delta_time_accum(double sample)
         printf("Adjust system clock by %f seconds? (Y)es, (N)o or (Q)uit?\n",new_mean_time);
         fgets(ans, 16, stdin); 
 
-        if(ans[0]=='Y' || ans[0] == 'y') adjustSystemClock(new_mean_time);
+        if(ans[0]=='Y' || ans[0] == 'y') adjustSystemClock(new_mean_time);            
         else
         {
             printf("Skipping clock adjustment.\n");

@@ -1,8 +1,8 @@
 # jtxsync
-jtsync is a utility used in conjunction with WSJT-X to adjust the local system clock using received FT8 messages delta time information.\
+jtsync is a utility used in conjunction with WSJT-X to adjust the local system clock using received FT8 messages delta time information.
 
-jtsync is intended for Linux and MacOS systems.\ 
-Status:\
+jtsync is intended for Linux and MacOS systems.  
+Status:  
     Linux: Working\
     MacOS Apple Silicon: Working\
     MacOS Intel: Working\

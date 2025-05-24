@@ -42,6 +42,15 @@ double network_buffer_to_double(const unsigned char *buffer) {
     return value;
 }
 
+// Print Current Time
+void print_time(char *prompt)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    struct tm* ptm = localtime(&tv.tv_sec);
+    printf("%s: %02d:%02d:%02d.%03ld\n", prompt, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, tv.tv_usec / 1000);
+    return;
+}
 
 /*
  * Adjusts the system clock by a specified delta time.
@@ -78,8 +87,9 @@ int adjustSystemClock(double delta_time) {
         new_time.tv_usec += 1000000;
     }
     //Print the time before adjustment
-    time(&t); // Get the current time
-    printf("Current time is: %s", ctime(&t)); // Display the current time
+    //time(&t); // Get the current time
+    //printf("Current time is: %s", ctime(&t)); // Display the current time
+    print_time("Current time");
     // Set the new system time
     if (settimeofday(&new_time, NULL) == -1) {
         fprintf(stderr, "Error setting new time: %s\n", strerror(errno));
@@ -91,8 +101,9 @@ int adjustSystemClock(double delta_time) {
     }
     else
     {
-        time(&t); // Get the adjusted time
-        printf("Adjusted time is: %s", ctime(&t)); // Display the adjusted time
+        print_time("Adjusted time");
+        //time(&t); // Get the adjusted time
+        //printf("Adjusted time is: %s", ctime(&t)); // Display the adjusted time
     }
 
     printf("System clock adjusted successfully by %lf seconds.\n", delta_time);
@@ -104,9 +115,9 @@ int adjustSystemClock(double delta_time) {
 }
 
 // Time adjustment calculations
-#define MAX_SAMPLES 20
-#define MIN_SAMPLES 10
-uint32_t sample_count,sample_next;
+#define MAX_SAMPLES 10
+
+uint32_t sample_i;
 double sample_array[MAX_SAMPLES], new_array[MAX_SAMPLES];
 
 // standard deviation and mean
@@ -129,8 +140,7 @@ double std_deviation(double data[], uint32_t data_len, double *mean)
 void init_delta_time_accum(void)
 {
     printf("Initializing Time Correction Calculation.\n");
-    sample_count = 0;
-    sample_next = 0;
+    sample_i=0;
     memset(sample_array, 0, sizeof(sample_array));
 }
 
@@ -139,34 +149,35 @@ void delta_time_accum(double sample)
     int i;
     double sdev = 0.0, mean=0.0;
 
-    // accumulate samples in rotating buffer
-    // minimum of 10 
-    printf("sample %u: %f \n",sample_count,sample);
-    sample_array[sample_next]=sample;
-    if(++sample_next >= MAX_SAMPLES) sample_next = 0;
-    sample_count++;
-    
+    // accumulate MAX_SAMPLES samples
 
-    // update every 10 samples
-    
-    if((sample_count) % 10 == 0)
-    { 
+    printf("sample %u: %f \n",sample_i,sample);
+    sample_array[sample_i]=sample;
+    sample_i +=1;
+    if( sample_i >= MAX_SAMPLES) 
+    {
+        sample_i = 0;
+        // update every 10 samples
+     
         double new_mean_time;
         char ans[16];
-        sdev = std_deviation(&sample_array[0], sample_next, &mean); 
+        sdev = std_deviation(&sample_array[0], MAX_SAMPLES, &mean); 
         if(DEBUG) printf("sdev: %f mean: %f\n",sdev, mean);
         // calculate new mean from samples that fall within mean+/- 1 or 2 sdev
         int new_mean_count = 0;
         double new_mean_sum = 0.0;
-        for(i=0;i<sample_count;i++)
+        printf("Ingoring samples greater/less than +/- %f\n",fabs(mean+sdev));
+        for(i=0;i<MAX_SAMPLES;i++)
         {
             if (fabs(sample_array[i]) <= fabs(mean+sdev))
             {
                 new_mean_sum +=sample_array[i];
                 new_mean_count++;
+                //printf("inside loop: new_mean_count %u\n",new_mean_count);
             }
         }
-        new_mean_time = -1.0*(new_mean_sum / new_mean_count);
+        if(DEBUG)printf("new_mean_count %u\n",new_mean_count);
+        new_mean_time = -1.0*(new_mean_sum / (new_mean_count));
      
         printf("Adjust system clock by %f seconds? (Y)es, (N)o or (Q)uit?\n",new_mean_time);
         fgets(ans, 16, stdin); 
@@ -182,8 +193,6 @@ void delta_time_accum(double sample)
 }
 
 
-
-
 // WSJT-X message header structure
 typedef struct {
     uint32_t magic;
@@ -196,7 +205,6 @@ typedef struct {
     wsjtx_header_t header;
     char *payload;
 } wsjtx_message_t;
-
 
 
 int main() 

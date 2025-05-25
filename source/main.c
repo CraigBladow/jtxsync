@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>   
 
 #define WSJTX_PORT 2237
-#define MAX_BUF_SIZE 1024
+#define MAX_BUF_SIZE 2048
 #define DEFAULT_NUM_SAMPLES 10
 #define MAX_SAMPLES 100
 

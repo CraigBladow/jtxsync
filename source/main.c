@@ -43,8 +43,8 @@ uint32_t max_samples = 10; //default setting for max_samples
 void usage(void)
 {
     printf("Usage:\n");
-    printf("Launch with ./jtsync with default of 10 delta time (DT) samples.\n");
-    printf("For more or less samples use ./jtsynd -n ## where ## is a number from 1 to 100.\n");
+    printf("jtsync launces with a default of 10 delta time (DT) samples.\n");
+    printf("For more or less samples use jtsync -n ### where ### is a number from 2 to 100.\n");
 }
 
 double network_buffer_to_double(const unsigned char *buffer) {
@@ -157,7 +157,7 @@ double std_deviation(double data[], uint32_t data_len, double *mean)
 }
 void init_delta_time_accum(void)
 {
-    printf("Initializing Time Correction Calculation.\n");
+    printf("Initializing time correction Calculation.\n");
     sample_i=0;
     memset(sample_array, 0, sizeof(sample_array));
 }
@@ -201,7 +201,16 @@ void delta_time_accum(double sample)
         printf("Adjust system clock by %f seconds? (Y)es, (N)o or (Q)uit?\n",new_mean_time);
         fgets(ans, 16, stdin); 
 
-        if(ans[0]=='Y' || ans[0] == 'y') adjustSystemClock(new_mean_time);            
+        if(ans[0]=='Y' || ans[0] == 'y') 
+        {
+            if(adjustSystemClock(new_mean_time) == -1)
+            {
+                printf("Do you want to quit jtxsync?  (Y)es, (N)o ?\n");
+                fgets(ans, 16, stdin); 
+                if(ans[0]=='Y' || ans[0] == 'y') exit_commanded = 1;
+            }
+
+        }           
         else
         {
             printf("Skipping clock adjustment.\n");
@@ -252,9 +261,9 @@ int main(int argc, char *argv[])
                     i++;
 
                     max_samples = atoi((char *)argv[i]);
-                    if (max_samples < 1) max_samples = 1;
+                    if (max_samples < 2) max_samples = 2;
                     else if (max_samples > 100) max_samples = 100;
-                    printf("Using %d samples for calculations.\n",i);
+
 
                     break;
                 
@@ -272,6 +281,7 @@ int main(int argc, char *argv[])
     printf("Copyright (C) 2025 Craig Bladow.  All rights reserved.\n");
     printf("This is free software; see the LICENSE file for copying conditions.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n");
     usage();
+    printf("Using %d samples for calculations.\n",max_samples);
 
     // Create UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 

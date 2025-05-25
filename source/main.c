@@ -43,7 +43,7 @@ uint32_t max_samples = 10;   // default setting for max_samples
 void usage(void)
 {
     printf("Usage:\n");
-    printf("jtsync launces with a default of 10 delta time (DT) samples.\n");
+    printf("jtsync launches with a default of 10 delta time (DT) samples.\n");
     printf("For more or less samples use jtsync -n ### where ### is a number from 2 to 100.\n");
 }
 
@@ -94,7 +94,7 @@ int adjustSystemClock(double delta_time)
     long microseconds;
 
     char ans[16];
-    time_t t; // Define the variable t
+    time_t t;
     // Get the current system time
     if (gettimeofday(&current_time, NULL) == -1)
     {
@@ -122,14 +122,12 @@ int adjustSystemClock(double delta_time)
         new_time.tv_usec += 1000000;
     }
     // Print the time before adjustment
-    // time(&t); // Get the current time
-    // printf("Current time is: %s", ctime(&t)); // Display the current time
     print_current_time("Current time");
     // Set the new system time
     if (settimeofday(&new_time, NULL) == -1)
     {
         fprintf(stderr, "Error setting new time: %s\n", strerror(errno));
-        // Specific error message for permission denied
+
         if (errno == EPERM)
         {
             fprintf(stderr, "Permission denied. You might need to run this program as root (e.g., using 'sudo').\n");
@@ -179,13 +177,12 @@ void delta_time_accum(double sample)
     int i;
     double sdev = 0.0, mean = 0.0;
 
-    // accumulate max_samples samples
-
+    // Accumulate max_samples samples
     printf("sample %u: %f \n", sample_i, sample);
     sample_array[sample_i] = sample;
     sample_i += 1;
 
-    // update every max_samples
+    // Update every max_samples
     if (sample_i >= max_samples)
     {
         sample_i = 0;
@@ -269,7 +266,7 @@ int main(int argc, char *argv[])
                 {
                 // printf("arg[i][1]:%c\n",argv[i][1]);  // development debug
 
-                // set custom sample number
+                // Set custom sample number
                 case 'n':
                 case 'N':
                     i++;
@@ -337,7 +334,7 @@ int main(int argc, char *argv[])
         buffer[n] = '\0';
         wsjtx_message_t *message = (wsjtx_message_t *)buffer;
 
-        // Check for WSJT-X magic number and schema
+        // Check for WSJT-X magic number, schema and id.
         if (ntohl(message->header.magic) == 0xadbccbda)
         {
             uint32_t schema = ntohl(message->header.schema);
@@ -345,7 +342,7 @@ int main(int argc, char *argv[])
             if (DEBUG)
                 printf("Received WSJT-X message header schema: %u msg_id: %u \n", schema, msg_id);
 
-            // Handle schema 2 and 3 messages
+            // Handle schemas other than 2
             if (schema != 2)
             {
                 printf("Can't decode schema: %u\n", schema);
@@ -359,19 +356,20 @@ int main(int argc, char *argv[])
             else
             {
 
-                /* WSJT-X message structure for schema 2, Decode message                        Id (unique key)        utf8
-                                         New                    bool
-                                         Time                   QTime
-                                         snr                    qint32
-                                         Delta time (S)         float (serialized as double)
-                                         Delta frequency (Hz)   quint32
-                                         Mode                   utf8
-                                         Message                utf8
-                                         Low confidence         bool
+                /* WSJT-X message structure for schema 2, Decode message 
+                                         Unique Id Length       uint32  4 bytes                       
+                                         Id (unique key)        utf8      'WSJT-X'  6 bytes
+                                         New                    bool     1 byte
+                                         Time                   Time     3 bytes
+                                         snr                    int32    4 bytes
+                                         Delta time (S)         double   8 bytes
+                                         Delta frequency (Hz)   uint32   4 bytes
+                                         Mode                   utf8     tbd
+                                         Message                utf8     tbd
+                                         Low confidence         bool     tbd
                 */
 
                 // Process schema 2 decode message
-                // Id Unique Key # bytes
                 uint32_t count = 12; // skipping header bytes
                 uint32_t uid_len = 0;
                 uint32_t i = 0;
@@ -380,10 +378,7 @@ int main(int argc, char *argv[])
                 if (DEBUG)
                     printf("Received WSJT-X message, schema: %u msg_id: %u", schema, msg_id);
 
-                // Decode Unique Id it shoulb be WSJT-X
-                // Ignore if not WSJT-X
-                // uid_len= (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
-                // doing as follows to quiet warnings
+                // Decode Unique Id it should be WSJT-X
                 uid_len = (buffer[count++] << 24);
                 uid_len |= (buffer[count++] << 16);
                 uid_len |= (buffer[count++] << 8);
@@ -398,8 +393,8 @@ int main(int argc, char *argv[])
                     uid[i] = buffer[count++];
                 uid[count++] = '\0';
                 if (DEBUG)
-                    printf("    Unique ID: %s\n", uid); // its WSJT-X !
-
+                    printf("    Unique ID: %s\n", uid); // it's WSJT-X !
+                // Continue decod of unique ID is WSJT-X
                 if (strcmp(uid, "WSJT-X") == 0)
                 {
                     // Inital one time receive success message
@@ -409,13 +404,13 @@ int main(int argc, char *argv[])
                         status_receiving = 1;
                     }
 
-                    // decode new bool
+                    // Decode new bool - not needed
                     char new_bool = buffer[count++];
                     if (DEBUG)
                         printf("    new_bool %d\n", new_bool);
 
-                    // skip three byte Time vale
-                    count += 3; // skipping Time.
+                    // Skip three byte time value as not used
+                    count += 3; 
 
                     int32_t snr = ((int32_t)buffer[count++] << 24);
                     snr |= ((int32_t)buffer[count++] << 16);
@@ -424,29 +419,21 @@ int main(int argc, char *argv[])
                     if (DEBUG)
                         printf("    snr: %d\n", snr);
 
-                    // decode delta time
+                    // Decode delta time
                     char dtbuf[8];
                     for (i = 0; i < 8; i++)
                         dtbuf[i] = buffer[count + i];
                     delta_time = network_buffer_to_double((const unsigned char *)dtbuf);
                     delta_time_accum(delta_time);
-                    count += 8;
+                    count += 8;// Move past delta time double that was just decoded
                     if (DEBUG)
                         printf("    delta time: %f\n", delta_time);
-
-                    // decode delta frequency - not reliable and not needed
-                    // uint32_t delta_freq = (buffer[count++] << 24) | (buffer[count++] << 16) | (buffer[count++]<< 8) | (buffer[count++]);
-                    // if(DEBUG) printf("    delta freq: %u\n",delta_freq);
-
-                    // decode mode - not needed
-                    // char mode = buffer[count++];
-                    // if(DEBUG) printf("    mode: %d\n",(int)mode);
                 }
                 else if (DEBUG)
                     printf("Receiving traffic from %s", uid);
             }
         }
-    } // end while(exit_commanded == 0)
+    } // End while(exit_commanded == 0)
     printf("Thank you for using jtxsync!\n");
     close(sockfd);
     return 0;

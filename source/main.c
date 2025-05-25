@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_NUM_SAMPLES 10
 #define MAX_SAMPLES 100
 
-#define DEBUG 0
+#define DEBUG 0  // Set to 1 to display debug messages
 
 uint32_t exit_commanded = 0; // Setting to not 0 causes program to exit
 uint32_t max_samples = 10;   // default setting for max_samples
@@ -167,7 +167,7 @@ double std_deviation(double data[], uint32_t data_len, double *mean)
 }
 void init_delta_time_accum(void)
 {
-    printf("Initializing time correction Calculation.\n");
+    printf("Initializing time correction calculation.\n");
     sample_i = 0;
     memset(sample_array, 0, sizeof(sample_array));
 }
@@ -196,7 +196,7 @@ void delta_time_accum(double sample)
             printf("sdev: %f mean: %f\n", sdev, mean);
 
         // Calculate new mean from samples that fall within mean +/- 1 sdev
-        printf("Ingoring samples greater/less than +/- %f\n", fabs(mean + sdev));
+        printf("Ignoring samples greater/less than +/- %f\n", fabs(mean + sdev));
         for (i = 0; i < max_samples; i++)
         {
             if (fabs(sample_array[i]) <= fabs(mean + sdev))
@@ -340,12 +340,12 @@ int main(int argc, char *argv[])
             uint32_t schema = ntohl(message->header.schema);
             uint32_t msg_id = ntohl(message->header.msg_id);
             if (DEBUG)
-                printf("Received WSJT-X message header schema: %u msg_id: %u \n", schema, msg_id);
+                printf("Received WSJT-X message schema: %u msg_id: %u ", schema, msg_id);
 
             // Handle schemas other than 2
             if (schema != 2)
             {
-                printf("Can't decode schema: %u\n", schema);
+                printf("    Can't decode schema: %u\n", schema);
             }
             else if (msg_id != 2)
             {
@@ -355,11 +355,10 @@ int main(int argc, char *argv[])
             }
             else
             {
-
                 /* WSJT-X message structure for schema 2, Decode message 
                                          Unique Id Length       uint32  4 bytes                       
                                          Id (unique key)        utf8      'WSJT-X'  6 bytes
-                                         New                    bool     1 byte
+                                         New                    bool     1 bytes
                                          Time                   Time     3 bytes
                                          snr                    int32    4 bytes
                                          Delta time (S)         double   8 bytes
@@ -375,8 +374,7 @@ int main(int argc, char *argv[])
                 uint32_t i = 0;
                 double delta_time;
 
-                if (DEBUG)
-                    printf("Received WSJT-X message, schema: %u msg_id: %u", schema, msg_id);
+                //if (DEBUG) printf("Received WSJT-X message, schema: %u msg_id: %u", schema, msg_id);
 
                 // Decode Unique Id it should be WSJT-X
                 uid_len = (buffer[count++] << 24);
@@ -388,13 +386,14 @@ int main(int argc, char *argv[])
                 if (uid_len > 15)
                     uid_len = 15; // Don't let the length exceed uid[] size less one.
                 if (DEBUG)
-                    printf("    Unique ID len: %u\n", uid_len);
-                for (i = 0; i < uid_len; i++)
-                    uid[i] = buffer[count++];
-                uid[count++] = '\0';
+                    printf("    Unique ID len: %u ", uid_len);
+                for (i = 0; i < uid_len; i++) uid[i] = buffer[count++];
+                uid[i] = '\0';
+                count++;  // makes this work?
+                
                 if (DEBUG)
                     printf("    Unique ID: %s\n", uid); // it's WSJT-X !
-                // Continue decod of unique ID is WSJT-X
+                // Continue decode of unique ID is WSJT-X
                 if (strcmp(uid, "WSJT-X") == 0)
                 {
                     // Inital one time receive success message
@@ -405,9 +404,10 @@ int main(int argc, char *argv[])
                     }
 
                     // Decode new bool - not needed
-                    char new_bool = buffer[count++];
-                    if (DEBUG)
-                        printf("    new_bool %d\n", new_bool);
+                    //char new_bool = buffer[count++];
+                    //if (DEBUG) printf("    new_bool %d\n", new_bool);
+                    // Skip new bool
+                    count += 1;
 
                     // Skip three byte time value as not used
                     count += 3; 
@@ -421,16 +421,14 @@ int main(int argc, char *argv[])
 
                     // Decode delta time
                     char dtbuf[8];
-                    for (i = 0; i < 8; i++)
-                        dtbuf[i] = buffer[count + i];
+                    for (i = 0; i < 8; i++) dtbuf[i] = buffer[count + i];
                     delta_time = network_buffer_to_double((const unsigned char *)dtbuf);
                     delta_time_accum(delta_time);
                     count += 8;// Move past delta time double that was just decoded
-                    if (DEBUG)
-                        printf("    delta time: %f\n", delta_time);
+                    if (DEBUG) printf("    Decoded delta time: %f\n", delta_time);
                 }
                 else if (DEBUG)
-                    printf("Receiving traffic from %s", uid);
+                    printf("!Receiving traffic from other source %s\n", uid);
             }
         }
     } // End while(exit_commanded == 0)

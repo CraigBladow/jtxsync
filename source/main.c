@@ -1,5 +1,23 @@
-// TODO fix nan result if first adjustment NOT accepted with a no answer.
-// TODO does this work on ARM?
+
+/*********************************************************************
+jtxsync
+
+Copyright (C) 2025 Craig Bladow, K0CWB
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+**********************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,10 +32,20 @@
 
 #define WSJTX_PORT 2237
 #define MAX_BUF_SIZE 1024
+#define DEFAULT_NUM_SAMPLES 10
+#define MAX_SAMPLES 100
 
 #define DEBUG 0
 
 uint32_t exit_commanded = 0; //Setting to not 0 causes program to exit
+uint32_t max_samples = 10; //default setting for max_samples
+
+void usage(void)
+{
+    printf("Usage:\n");
+    printf("Launch with ./jtsync with default of 10 delta time (DT) samples.\n");
+    printf("For more or less samples use ./jtsynd -n ## where ## is a number from 1 to 100.\n");
+}
 
 double network_buffer_to_double(const unsigned char *buffer) {
     double value;
@@ -42,8 +70,8 @@ double network_buffer_to_double(const unsigned char *buffer) {
     return value;
 }
 
-// Print Current Time
-void print_time(char *prompt)
+
+void print_current_time(char *prompt)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -65,7 +93,8 @@ int adjustSystemClock(double delta_time) {
     char ans[16];
     time_t t; // Define the variable t
     // Get the current system time
-    if (gettimeofday(&current_time, NULL) == -1) {
+    if (gettimeofday(&current_time, NULL) == -1) 
+    {
         perror("Error getting current time");
         return -1;
     }
@@ -89,7 +118,7 @@ int adjustSystemClock(double delta_time) {
     //Print the time before adjustment
     //time(&t); // Get the current time
     //printf("Current time is: %s", ctime(&t)); // Display the current time
-    print_time("Current time");
+    print_current_time("Current time");
     // Set the new system time
     if (settimeofday(&new_time, NULL) == -1) {
         fprintf(stderr, "Error setting new time: %s\n", strerror(errno));
@@ -99,15 +128,10 @@ int adjustSystemClock(double delta_time) {
         }
         return -1;
     }
-    else
-    {
-        print_time("Adjusted time");
-        //time(&t); // Get the adjusted time
-        //printf("Adjusted time is: %s", ctime(&t)); // Display the adjusted time
-    }
+    else print_current_time("Adjusted time");
+
 
     printf("System clock adjusted successfully by %lf seconds.\n", delta_time);
-   // printf("New system time set to: %ld seconds, %i microseconds since epoch.\n", new_time.tv_sec, new_time.tv_usec);
     printf("Do you want to quit jtxsync?  (Y)es, (N)o ?\n");
     fgets(ans, 16, stdin); 
     if(ans[0]=='Y' || ans[0] == 'y') exit_commanded = 1;
@@ -115,21 +139,15 @@ int adjustSystemClock(double delta_time) {
 }
 
 // Time adjustment calculations
-#define MAX_SAMPLES 10
-
 uint32_t sample_i;
-double sample_array[MAX_SAMPLES], new_array[MAX_SAMPLES];
+double sample_array[MAX_SAMPLES]; 
 
 // standard deviation and mean
 double std_deviation(double data[], uint32_t data_len, double *mean) 
 {
     double sum = 0.0, std_dev = 0.0,sum_sqrs=0.0,variance = 0.0;
     int i;
-    if(data_len > MAX_SAMPLES) 
-    {
-        data_len = MAX_SAMPLES;
-        printf("data_len toooo long!\n");
-    }
+    if(data_len > MAX_SAMPLES) data_len = MAX_SAMPLES;
     for (i = 0; i < data_len; i++) sum += data[i];
     *mean = sum / data_len;
     for (i = 0; i < data_len; i++) sum_sqrs += pow(data[i] - *mean, 2);
@@ -149,31 +167,32 @@ void delta_time_accum(double sample)
     int i;
     double sdev = 0.0, mean=0.0;
 
-    // accumulate MAX_SAMPLES samples
+    // accumulate max_samples samples
 
     printf("sample %u: %f \n",sample_i,sample);
     sample_array[sample_i]=sample;
     sample_i +=1;
-    if( sample_i >= MAX_SAMPLES) 
+
+    // update every max_samples
+    if( sample_i >= max_samples) 
     {
         sample_i = 0;
-        // update every 10 samples
-     
         double new_mean_time;
         char ans[16];
-        sdev = std_deviation(&sample_array[0], MAX_SAMPLES, &mean); 
-        if(DEBUG) printf("sdev: %f mean: %f\n",sdev, mean);
-        // calculate new mean from samples that fall within mean+/- 1 or 2 sdev
         int new_mean_count = 0;
         double new_mean_sum = 0.0;
+
+        sdev = std_deviation(&sample_array[0], max_samples, &mean); 
+        if(DEBUG) printf("sdev: %f mean: %f\n",sdev, mean);
+
+        // Calculate new mean from samples that fall within mean +/- 1 sdev
         printf("Ingoring samples greater/less than +/- %f\n",fabs(mean+sdev));
-        for(i=0;i<MAX_SAMPLES;i++)
+        for(i=0;i<max_samples;i++)
         {
             if (fabs(sample_array[i]) <= fabs(mean+sdev))
             {
                 new_mean_sum +=sample_array[i];
                 new_mean_count++;
-                //printf("inside loop: new_mean_count %u\n",new_mean_count);
             }
         }
         if(DEBUG)printf("new_mean_count %u\n",new_mean_count);
@@ -206,21 +225,53 @@ typedef struct {
     char *payload;
 } wsjtx_message_t;
 
-
-int main() 
+ 
+int main(int argc, char *argv[])
 {
     int sockfd;
     struct sockaddr_in servaddr, cliaddr;
     socklen_t len;
     char buffer[MAX_BUF_SIZE];
+    int i;
 
     uint32_t status_receiving = 0;  // Inital one time receive success message sets to 1
+    if (argc == 1) max_samples = DEFAULT_NUM_SAMPLES;
+    else
+    {
+        for (i = 1; i < argc; i++)
+        {
+            if (argv[i][0] == '-')
+            {
+                switch (argv[i][1])
+                {
+                // printf("arg[i][1]:%c\n",argv[i][1]);  // development debug 
 
+                //set custom sample number
+                case 'n': 
+                case 'N':
+                    i++;
+
+                    max_samples = atoi((char *)argv[i]);
+                    if (max_samples < 1) max_samples = 1;
+                    else if (max_samples > 100) max_samples = 100;
+                    printf("Using %d samples for calculations.\n",i);
+
+                    break;
+                
+                default:
+                    fprintf(stderr, "%s: unknown arg %s\n",
+                            argv[0], argv[i]);
+                    usage();
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
+    }
     // Welcome 
     printf("Welcome to jtxsync development version 0.1 by K0CWB.\n");
     printf("Copyright (C) 2025 Craig Bladow.  All rights reserved.\n");
-    printf("This is free software; see the LICENSE file for copying conditions.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
-
+    printf("This is free software; see the LICENSE file for copying conditions.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n");
+    usage();
 
     // Create UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 

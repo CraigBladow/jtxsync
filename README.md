@@ -1,4 +1,4 @@
-# jtxsync version 0.2
+# jtxsync version 0.3
 jtsync is a utility used in conjunction with WSJT-X to adjust the local system clock using received FT8 messages delta time information.
 
 jtsync is intended for Linux and MacOS systems.  
@@ -10,8 +10,8 @@ Status:
 Runs in the Terminal.\
 Use of this utility will require root privleges via sudo to adjust the system clock.\
 After starting WSJT-X in FT8 mode and messages are being decoded, open a terminal in the directory holding jtsync and run the following command, "sudo ./jtxsync".\
-Optionally adding '-n ###' where ### is a number from 2 to 100 the number of samples can be specified.  
-Once jtsync has gathered delta time samples from 2 to 100 messages with 10 being the default, the user will be prompted to adjust the system clock.\
+Optionally adding '-n ###' where ### is a number from 4 to 100 the number of samples can be specified.  
+Once jtsync has gathered delta time samples from 4 to 100 messages with 10 being the default, the user will be prompted to adjust the system clock.\
 Selecting Y for yes will update the system clock, N for no will not update the system clock, and Q for quit will exit the program.\
 Selecting N for no will cause jtxsync to gather more messages and prompt the user again to approve an adjustment.
 

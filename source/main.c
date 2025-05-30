@@ -1,6 +1,6 @@
 
 /*********************************************************************
-jtxsync version 0.2
+jtxsync version 0.3
 
 Copyright (C) 2025 Craig Bladow, K0CWB
 
@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_BUF_SIZE 2048
 #define DEFAULT_NUM_SAMPLES 10
 #define MAX_SAMPLES 100
+#define MIN_SAMPLES 4
 
 #define DEBUG 0  // Set to 1 to display debug messages
 
@@ -44,7 +45,7 @@ void usage(void)
 {
     printf("Usage:\n");
     printf("jtsync launches with a default of 10 delta time (DT) samples.\n");
-    printf("For more or less samples use jtsync -n ### where ### is a number from 2 to 100.\n");
+    printf("For more or less samples use jtsync -n ### where ### is a number from %d to %d.\n",MIN_SAMPLES,MAX_SAMPLES);
 }
 
 double network_buffer_to_double(const unsigned char *buffer)
@@ -149,7 +150,7 @@ int adjustSystemClock(double delta_time)
 uint32_t sample_i;
 double sample_array[MAX_SAMPLES];
 
-// standard deviation and mean
+// sample standard deviation and mean
 double std_deviation(double data[], uint32_t data_len, double *mean)
 {
     double sum = 0.0, std_dev = 0.0, sum_sqrs = 0.0, variance = 0.0;
@@ -161,7 +162,7 @@ double std_deviation(double data[], uint32_t data_len, double *mean)
     *mean = sum / data_len;
     for (i = 0; i < data_len; i++)
         sum_sqrs += pow(data[i] - *mean, 2);
-    variance = sum_sqrs / data_len;
+    variance = sum_sqrs / (data_len-1);
     std_dev = sqrt(variance);
     return std_dev;
 }
@@ -190,16 +191,21 @@ void delta_time_accum(double sample)
         char ans[16];
         int new_mean_count = 0;
         double new_mean_sum = 0.0;
+        double upper_bound, lower_bound;
+        
 
         sdev = std_deviation(&sample_array[0], max_samples, &mean);
         if (DEBUG)
             printf("sdev: %f mean: %f\n", sdev, mean);
 
         // Calculate new mean from samples that fall within mean +/- 1 sdev
-        printf("Ignoring samples greater/less than +/- %f\n", fabs(mean + sdev));
+        upper_bound = mean + sdev;
+        lower_bound = mean - sdev;
+        printf("Ignoring samples less than %f seconds and greater than %f seconds.\n", lower_bound,upper_bound);
         for (i = 0; i < max_samples; i++)
         {
-            if (fabs(sample_array[i]) <= fabs(mean + sdev))
+            //if (fabs(sample_array[i]) <= fabs(mean + sdev))
+            if(sample_array[i]>lower_bound && sample_array[i]<upper_bound)
             {
                 new_mean_sum += sample_array[i];
                 new_mean_count++;
@@ -207,25 +213,35 @@ void delta_time_accum(double sample)
         }
         if (DEBUG)
             printf("new_mean_count %u\n", new_mean_count);
-        new_mean_time = -1.0 * (new_mean_sum / (new_mean_count));
-
-        printf("Adjust system clock by %f seconds? (Y)es, (N)o or (Q)uit?\n", new_mean_time);
-        fgets(ans, 16, stdin);
-
-        if (ans[0] == 'Y' || ans[0] == 'y')
+        if(new_mean_count >= 1)
         {
-            if (adjustSystemClock(new_mean_time) == -1)
+            new_mean_time = -1.0 * (new_mean_sum / (new_mean_count));
+
+            printf("Adjust system clock by %f seconds? (Y)es, (N)o or (Q)uit?\n", new_mean_time);
+            fgets(ans, 16, stdin);
+
+            if (ans[0] == 'Y' || ans[0] == 'y')
             {
-                printf("Do you want to quit jtxsync?  (Y)es, (N)o ?\n");
-                fgets(ans, 16, stdin);
-                if (ans[0] == 'Y' || ans[0] == 'y')
+                if (adjustSystemClock(new_mean_time) == -1)
+                {
+                    printf("Do you want to quit jtxsync?  (Y)es, (N)o ?\n");
+                    fgets(ans, 16, stdin);
+                    if (ans[0] == 'Y' || ans[0] == 'y')
+                        exit_commanded = 1;
+                }
+            }
+            else
+            {
+                printf("Skipping clock adjustment.\n");
+                if (ans[0] == 'Q' || ans[0] == 'q')
                     exit_commanded = 1;
             }
         }
         else
         {
-            printf("Skipping clock adjustment.\n");
-            if (ans[0] == 'Q' || ans[0] == 'q')
+            printf("Calculation failed, Do you want to try again?  (Y)es, (N)o ?\n");
+            fgets(ans, 16, stdin);
+            if (ans[0] == 'N' || ans[0] == 'n')
                 exit_commanded = 1;
         }
     }
@@ -272,10 +288,10 @@ int main(int argc, char *argv[])
                     i++;
 
                     max_samples = atoi((char *)argv[i]);
-                    if (max_samples < 2)
-                        max_samples = 2;
-                    else if (max_samples > 100)
-                        max_samples = 100;
+                    if (max_samples < MIN_SAMPLES)
+                        max_samples = MIN_SAMPLES;
+                    else if (max_samples > MAX_SAMPLES)
+                        max_samples = MAX_SAMPLES;
 
                     break;
 
@@ -289,7 +305,7 @@ int main(int argc, char *argv[])
         }
     }
     // Welcome
-    printf("Welcome to jtxsync development version 0.2 by K0CWB.\n");
+    printf("Welcome to jtxsync development version 0.3 by K0CWB.\n");
     printf("Copyright (C) 2025 Craig Bladow.  All rights reserved.\n");
     printf("This is free software; see the LICENSE file for copying conditions.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n");
     usage();

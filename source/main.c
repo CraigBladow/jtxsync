@@ -79,7 +79,7 @@ void print_current_time(char *prompt)
     struct timeval tv;
     gettimeofday(&tv, NULL);
     struct tm *ptm = localtime(&tv.tv_sec);
-    printf("%s: %02d:%02d:%02d.%03ld\n", prompt, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, tv.tv_usec / 1000);
+    printf("%s: %02d:%02d:%02d.%03ld\n", prompt, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tv.tv_usec / 1000);
     return;
 }
 
